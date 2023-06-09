@@ -23,6 +23,9 @@ type Repostitory struct {
 }
 
 func normalize_path(dirtypath string) string {
+	if dirtypath == "." || dirtypath == "" {
+		return ""
+	}
 	p := filepath.Clean(dirtypath)
 	return strings.TrimPrefix(string(p), "/") + "/"
 }
@@ -37,6 +40,21 @@ func main() {
 				"addr": "https://github.com/SigmaHQ/sigma",
 				"lasthash": "c5c61ac04052632889999f21f96ddbec9efa2219",
 				"rulespath": "rules"
+			},
+			{
+				"addr": "https://github.com/P4T12ICK/Sigma-Rule-Repository",
+				"lasthash": "b1d104905be53808b89846ae0fc283a0eedca392",
+				"rulespath": "detection-rules"
+			},
+			{
+				"addr": "https://github.com/The-DFIR-Report/Sigma-Rules",
+				"lasthash": "68e9ce25c14b18ca8f8d8c47145ace448423b387",
+				"rulespath": "rules"
+			},
+			{
+				"addr": "https://github.com/blacklanternsecurity/sigma-rules",
+				"lasthash": "2756d417a5188228d6a3b0bb6e764dcbcac0d3da",
+				"rulespath": "."
 			}
 		]
 	}
