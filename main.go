@@ -18,6 +18,7 @@ type Config struct {
 
 type Repostitory struct {
 	Addr      string `json:"addr"`
+	Branch    string `json:"branch"`
 	Lasthash  string `json:"lasthash"`
 	Rulespath string `json:"rulespath"`
 }
@@ -33,26 +34,31 @@ func main() {
 	config := `{
 		"repos": [{
 				"addr": "https://github.com/joesecurity/sigma-rules/",
+				"branch": "master",
 				"lasthash": "39c5f36034e12ca81a7a4d835889dfb07c0b3903",
 				"rulespath": "rules"
 			},
 			{
 				"addr": "https://github.com/SigmaHQ/sigma",
+				"branch": "master",
 				"lasthash": "c5c61ac04052632889999f21f96ddbec9efa2219",
 				"rulespath": "rules"
 			},
 			{
 				"addr": "https://github.com/P4T12ICK/Sigma-Rule-Repository",
+				"branch": "master",
 				"lasthash": "b1d104905be53808b89846ae0fc283a0eedca392",
 				"rulespath": "detection-rules"
 			},
 			{
 				"addr": "https://github.com/The-DFIR-Report/Sigma-Rules",
+				"branch": "main",
 				"lasthash": "68e9ce25c14b18ca8f8d8c47145ace448423b387",
 				"rulespath": "rules"
 			},
 			{
 				"addr": "https://github.com/blacklanternsecurity/sigma-rules",
+				"branch": "main",
 				"lasthash": "2756d417a5188228d6a3b0bb6e764dcbcac0d3da",
 				"rulespath": "."
 			}
