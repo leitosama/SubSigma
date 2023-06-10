@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
@@ -14,6 +15,13 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
 )
+
+func getEnv(key string, defaultVal string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return defaultVal
+}
 
 type Config struct {
 	Repos []Repostitory `json:"repos"`
@@ -80,18 +88,23 @@ var (
 	VerboseLogger *log.Logger
 	InfoLogger    *log.Logger
 	ErrorLogger   *log.Logger
+	USESTATE      bool   = true
+	VERBOSE       bool   = false
+	STATEFILE     string = "./state.json"
+	CONFIGFILE    string = "./config.json"
 )
 
 // TODO: in config or to env or to cli options
-const USESTATE bool = true
-const VERBOSE bool = true
-const STATEFILE string = "./state.json"
-const CONFIGFILE string = "./config.json"
 
 func init() {
+	var err error
 	InfoLogger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
 	VerboseLogger = log.New(os.Stdout, "VERBOSE: ", log.Ldate|log.Ltime|log.Lshortfile)
 	ErrorLogger = log.New(os.Stderr, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
+	USESTATE, err = strconv.ParseBool(getEnv("USESTATE", "true"))
+	checkerr(err)
+	VERBOSE, err = strconv.ParseBool(getEnv("VERBOSE", "false"))
+	checkerr(err)
 }
 
 func checkerr(err error) {
@@ -137,11 +150,14 @@ func main() {
 			checkerr(err)
 			filechanges := compare(hcommit, sCommit, repo)
 			for _, filechange := range filechanges {
-				fmt.Println("[+]", filechange.String())
+				fmt.Printf("---\n%s\n%s\n", filechange.BaseName, filechange.RemoteUrl)
 			}
 		}
-		repo.LastCommit = ref.Hash().String()
-		cfg.Repos[i] = repo
+		if repo.LastCommit != ref.Hash().String() {
+			repo.LastCommit = ref.Hash().String()
+			cfg.Repos[i] = repo
+			fmt.Printf("[+] %s lastcommit - %s", repo.Addr, repo.LastCommit)
+		}
 		file, _ := json.MarshalIndent(cfg, "", " ")
 		_ = ioutil.WriteFile(STATEFILE, file, 0644)
 	}
