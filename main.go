@@ -51,14 +51,15 @@ const (
 
 type FileChange struct {
 	ChangeType ChangeEnum `json:"changetype"`
-	Filepath   string     `json:"filepath"`
+	BaseName   string     `json:"basename"`
+	RemoteUrl  string     `json:"remoteurl"`
 }
 
 func (f FileChange) String() string {
-	return fmt.Sprintf("{ChangeType: %v, Filepath: %s}", f.ChangeType, f.Filepath)
+	return fmt.Sprintf("{ChangeType: %v, BaseName: %s, Url: %s}", f.ChangeType, f.BaseName, f.RemoteUrl)
 }
 
-func compare(hcommit *object.Commit, scommit *object.Commit, rulespath string) []FileChange {
+func compare(hcommit *object.Commit, scommit *object.Commit, repo Repostitory) []FileChange {
 	result := []FileChange{}
 	patch, err := scommit.Patch(hcommit)
 	if err != nil {
@@ -66,8 +67,10 @@ func compare(hcommit *object.Commit, scommit *object.Commit, rulespath string) [
 	}
 	for _, el := range patch.FilePatches() {
 		oldfile, newfile := el.Files()
-		if oldfile == nil && strings.HasPrefix(newfile.Path(), rulespath) {
-			result = append(result, FileChange{ChangeType: New, Filepath: newfile.Path()})
+		if oldfile == nil && strings.HasPrefix(newfile.Path(), repo.Rulespath) {
+			path := newfile.Path()
+			remoteurl := fmt.Sprintf("%s/blob/%s/%s", repo.Addr, repo.Branch, path)
+			result = append(result, FileChange{ChangeType: New, BaseName: filepath.Base(path), RemoteUrl: remoteurl})
 		}
 	}
 	return result
@@ -132,7 +135,7 @@ func main() {
 			checkerr(err)
 			scommit, err := objrepo.CommitObject(plumbing.NewHash(repo.Lasthash))
 			checkerr(err)
-			filechanges := compare(hcommit, scommit, repo.Rulespath)
+			filechanges := compare(hcommit, scommit, repo)
 			for _, filechange := range filechanges {
 				fmt.Println("[+]", filechange.String())
 			}
