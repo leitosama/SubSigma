@@ -1,0 +1,28 @@
+{
+    "repos": [{
+            "addr": "https://github.com/joesecurity/sigma-rules/",
+            "branch": "master",
+            "rulespath": "rules"
+        },
+        {
+            "addr": "https://github.com/SigmaHQ/sigma",
+            "branch": "master",
+            "rulespath": "rules"
+        },
+        {
+            "addr": "https://github.com/P4T12ICK/Sigma-Rule-Repository",
+            "branch": "master",
+            "rulespath": "detection-rules"
+        },
+        {
+            "addr": "https://github.com/The-DFIR-Report/Sigma-Rules",
+            "branch": "main",
+            "rulespath": "rules"
+        },
+        {
+            "addr": "https://github.com/blacklanternsecurity/sigma-rules",
+            "branch": "main",
+            "rulespath": "."
+        }
+    ]
+}

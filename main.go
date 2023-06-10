@@ -3,12 +3,14 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
 )
 
@@ -30,50 +32,61 @@ func normalize_path(dirtypath string) string {
 	p := filepath.Clean(dirtypath)
 	return strings.TrimPrefix(string(p), "/") + "/"
 }
-func main() {
-	config := `{
-		"repos": [{
-				"addr": "https://github.com/joesecurity/sigma-rules/",
-				"branch": "master",
-				"lasthash": "39c5f36034e12ca81a7a4d835889dfb07c0b3903",
-				"rulespath": "rules"
-			},
-			{
-				"addr": "https://github.com/SigmaHQ/sigma",
-				"branch": "master",
-				"lasthash": "c5c61ac04052632889999f21f96ddbec9efa2219",
-				"rulespath": "rules"
-			},
-			{
-				"addr": "https://github.com/P4T12ICK/Sigma-Rule-Repository",
-				"branch": "master",
-				"lasthash": "b1d104905be53808b89846ae0fc283a0eedca392",
-				"rulespath": "detection-rules"
-			},
-			{
-				"addr": "https://github.com/The-DFIR-Report/Sigma-Rules",
-				"branch": "main",
-				"lasthash": "68e9ce25c14b18ca8f8d8c47145ace448423b387",
-				"rulespath": "rules"
-			},
-			{
-				"addr": "https://github.com/blacklanternsecurity/sigma-rules",
-				"branch": "main",
-				"lasthash": "2756d417a5188228d6a3b0bb6e764dcbcac0d3da",
-				"rulespath": "."
-			}
-		]
-	}
-	`
-	cfg := Config{}
-	err := json.Unmarshal([]byte(config), &cfg)
 
+type ChangeEnum int8
+
+const (
+	New ChangeEnum = iota
+	Changed
+)
+
+type FileChange struct {
+	ChangeType ChangeEnum `json:"changetype"`
+	Filepath   string     `json:"filepath"`
+}
+
+func compare(hcommit *object.Commit, scommit *object.Commit, rulespath string) []FileChange {
+	result := []FileChange{}
+	patch, err := scommit.Patch(hcommit)
+	if err != nil {
+		os.Exit(1)
+	}
+	for _, el := range patch.FilePatches() {
+		oldfile, newfile := el.Files()
+		if oldfile == nil && strings.HasPrefix(newfile.Path(), rulespath) {
+			result = append(result, FileChange{ChangeType: New, Filepath: newfile.Path()})
+		}
+	}
+	return result
+}
+
+// TODO: in config or to env or to cli options
+const USESTATE bool = true
+const STATEFILE string = "./state.json"
+const CONFIGFILE string = "./config.json"
+
+func main() {
+	var configfile string
+	if _, err := os.Stat(STATEFILE); err == nil && USESTATE {
+		configfile = STATEFILE
+	} else {
+		configfile = CONFIGFILE
+	}
+
+	config, err := ioutil.ReadFile(configfile)
+	if err != nil {
+		fmt.Println("Error open config.json", err)
+		os.Exit(1)
+	}
+	cfg := &Config{}
+	err = json.Unmarshal([]byte(config), cfg)
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println(cfg)
-	// TODO: Parse config to repos
-	for _, repo := range cfg.Repos {
+	for i, repo := range cfg.Repos {
+		cfg.Repos[i].Rulespath = normalize_path(repo.Rulespath)
+	}
+	for i, repo := range cfg.Repos {
 		objrepo, err := git.Clone(memory.NewStorage(), nil, &git.CloneOptions{
 			URL: repo.Addr,
 		})
@@ -83,29 +96,28 @@ func main() {
 		}
 
 		ref, _ := objrepo.Head()
-		hcommit, err := objrepo.CommitObject(ref.Hash())
 
-		if err != nil {
-			fmt.Println("Error getting head commit:", err)
-			os.Exit(1)
-		}
+		if repo.Lasthash == "" {
+			repo.Lasthash = ref.Hash().String()
+		} else {
+			hcommit, err := objrepo.CommitObject(ref.Hash())
 
-		scommit, err := objrepo.CommitObject(plumbing.NewHash(repo.Lasthash))
-		if err != nil {
-			fmt.Println("Error getting scommit:", err)
-			os.Exit(1)
-		}
-		patch, err := scommit.Patch(hcommit)
-		if err != nil {
-			os.Exit(1)
-		}
-		for _, el := range patch.FilePatches() {
-			oldfile, newfile := el.Files()
-			if oldfile == nil && strings.HasPrefix(newfile.Path(), repo.Rulespath) {
-				fmt.Println(newfile.Path())
+			if err != nil {
+				fmt.Println("Error getting head commit:", err)
+				os.Exit(1)
 			}
+
+			scommit, err := objrepo.CommitObject(plumbing.NewHash(repo.Lasthash))
+			if err != nil {
+				fmt.Println("Error getting scommit:", err)
+				os.Exit(1)
+			}
+			filechanges := compare(hcommit, scommit, repo.Rulespath)
+			fmt.Println(filechanges)
 		}
-		fmt.Println("new lasthash: ", hcommit.Hash)
+		cfg.Repos[i] = repo
+		file, _ := json.MarshalIndent(cfg, "", " ")
+		_ = ioutil.WriteFile(STATEFILE, file, 0644)
 	}
 
 }

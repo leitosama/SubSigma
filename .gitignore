@@ -22,3 +22,5 @@ go.work
 
 # User
 data
+config.json
+state.json
