@@ -20,25 +20,25 @@ type Config struct {
 }
 
 type Repostitory struct {
-	Addr      string `json:"addr"`
-	Branch    string `json:"branch"`
-	Lasthash  string `json:"lasthash"`
-	Rulespath string `json:"rulespath"`
+	Addr       string `json:"addr"`
+	Branch     string `json:"branch"`
+	LastCommit string `json:"lastcommit"`
+	RulesPath  string `json:"rulespath"`
 }
 
 func (r Repostitory) String() string {
-	return fmt.Sprintf("{Addr: %s, Branch: %s, Lasthash: %s, Rulespath: %s}", r.Addr, r.Branch, r.Lasthash, r.Rulespath)
+	return fmt.Sprintf("{Addr: %s, Branch: %s, Lasthash: %s, Rulespath: %s}", r.Addr, r.Branch, r.LastCommit, r.RulesPath)
 }
 
 func (c Config) String() string {
 	return fmt.Sprintf("{Repos:%v}", c.Repos)
 }
 
-func normalize_path(dirtypath string) string {
-	if dirtypath == "." || dirtypath == "" {
+func normalize_path(dirtyPath string) string {
+	if dirtyPath == "." || dirtyPath == "" {
 		return ""
 	}
-	p := filepath.Clean(dirtypath)
+	p := filepath.Clean(dirtyPath)
 	return strings.TrimPrefix(string(p), "/") + "/"
 }
 
@@ -59,15 +59,15 @@ func (f FileChange) String() string {
 	return fmt.Sprintf("{ChangeType: %v, BaseName: %s, Url: %s}", f.ChangeType, f.BaseName, f.RemoteUrl)
 }
 
-func compare(hcommit *object.Commit, scommit *object.Commit, repo Repostitory) []FileChange {
+func compare(hCommit *object.Commit, sCommit *object.Commit, repo Repostitory) []FileChange {
 	result := []FileChange{}
-	patch, err := scommit.Patch(hcommit)
+	patch, err := sCommit.Patch(hCommit)
 	if err != nil {
 		os.Exit(1)
 	}
 	for _, el := range patch.FilePatches() {
 		oldfile, newfile := el.Files()
-		if oldfile == nil && strings.HasPrefix(newfile.Path(), repo.Rulespath) {
+		if oldfile == nil && strings.HasPrefix(newfile.Path(), repo.RulesPath) {
 			path := newfile.Path()
 			remoteurl := fmt.Sprintf("%s/blob/%s/%s", repo.Addr, repo.Branch, path)
 			result = append(result, FileChange{ChangeType: New, BaseName: filepath.Base(path), RemoteUrl: remoteurl})
@@ -114,7 +114,7 @@ func main() {
 	err = json.Unmarshal([]byte(config), cfg)
 	checkerr(err)
 	for i, repo := range cfg.Repos {
-		cfg.Repos[i].Rulespath = normalize_path(repo.Rulespath)
+		cfg.Repos[i].RulesPath = normalize_path(repo.RulesPath)
 	}
 	if VERBOSE {
 		VerboseLogger.Println("config loaded.", cfg)
@@ -130,17 +130,17 @@ func main() {
 
 		ref, err := objrepo.Head()
 		checkerr(err)
-		if repo.Lasthash != "" {
+		if repo.LastCommit != "" {
 			hcommit, err := objrepo.CommitObject(ref.Hash())
 			checkerr(err)
-			scommit, err := objrepo.CommitObject(plumbing.NewHash(repo.Lasthash))
+			sCommit, err := objrepo.CommitObject(plumbing.NewHash(repo.LastCommit))
 			checkerr(err)
-			filechanges := compare(hcommit, scommit, repo)
+			filechanges := compare(hcommit, sCommit, repo)
 			for _, filechange := range filechanges {
 				fmt.Println("[+]", filechange.String())
 			}
 		}
-		repo.Lasthash = ref.Hash().String()
+		repo.LastCommit = ref.Hash().String()
 		cfg.Repos[i] = repo
 		file, _ := json.MarshalIndent(cfg, "", " ")
 		_ = ioutil.WriteFile(STATEFILE, file, 0644)
