@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,6 +24,14 @@ type Repostitory struct {
 	Branch    string `json:"branch"`
 	Lasthash  string `json:"lasthash"`
 	Rulespath string `json:"rulespath"`
+}
+
+func (r Repostitory) String() string {
+	return fmt.Sprintf("{Addr: %s, Branch: %s, Lasthash: %s, Rulespath: %s}", r.Addr, r.Branch, r.Lasthash, r.Rulespath)
+}
+
+func (c Config) String() string {
+	return fmt.Sprintf("{Repos:%v}", c.Repos)
 }
 
 func normalize_path(dirtypath string) string {
@@ -45,6 +54,10 @@ type FileChange struct {
 	Filepath   string     `json:"filepath"`
 }
 
+func (f FileChange) String() string {
+	return fmt.Sprintf("{ChangeType: %v, Filepath: %s}", f.ChangeType, f.Filepath)
+}
+
 func compare(hcommit *object.Commit, scommit *object.Commit, rulespath string) []FileChange {
 	result := []FileChange{}
 	patch, err := scommit.Patch(hcommit)
@@ -60,10 +73,30 @@ func compare(hcommit *object.Commit, scommit *object.Commit, rulespath string) [
 	return result
 }
 
+var (
+	VerboseLogger *log.Logger
+	InfoLogger    *log.Logger
+	ErrorLogger   *log.Logger
+)
+
 // TODO: in config or to env or to cli options
 const USESTATE bool = true
+const VERBOSE bool = true
 const STATEFILE string = "./state.json"
 const CONFIGFILE string = "./config.json"
+
+func init() {
+	InfoLogger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+	VerboseLogger = log.New(os.Stdout, "VERBOSE: ", log.Ldate|log.Ltime|log.Lshortfile)
+	ErrorLogger = log.New(os.Stderr, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
+}
+
+func checkerr(err error) {
+	if err != nil {
+		ErrorLogger.Println(err)
+		os.Exit(1)
+	}
+}
 
 func main() {
 	var configfile string
@@ -72,52 +105,41 @@ func main() {
 	} else {
 		configfile = CONFIGFILE
 	}
-
 	config, err := ioutil.ReadFile(configfile)
-	if err != nil {
-		fmt.Println("Error open config.json", err)
-		os.Exit(1)
-	}
+	checkerr(err)
 	cfg := &Config{}
 	err = json.Unmarshal([]byte(config), cfg)
-	if err != nil {
-		fmt.Println(err)
-	}
+	checkerr(err)
 	for i, repo := range cfg.Repos {
 		cfg.Repos[i].Rulespath = normalize_path(repo.Rulespath)
 	}
+	if VERBOSE {
+		VerboseLogger.Println("config loaded.", cfg)
+	}
 	for i, repo := range cfg.Repos {
+		if VERBOSE {
+			VerboseLogger.Printf("processing repos[%d] - %s", i, repo.String())
+		}
 		objrepo, err := git.Clone(memory.NewStorage(), nil, &git.CloneOptions{
 			URL: repo.Addr,
 		})
-		if err != nil {
-			fmt.Println("Error opening repository:", err)
-			os.Exit(1)
-		}
+		checkerr(err)
 
-		ref, _ := objrepo.Head()
-
-		if repo.Lasthash == "" {
-			repo.Lasthash = ref.Hash().String()
-		} else {
+		ref, err := objrepo.Head()
+		checkerr(err)
+		if repo.Lasthash != "" {
 			hcommit, err := objrepo.CommitObject(ref.Hash())
-
-			if err != nil {
-				fmt.Println("Error getting head commit:", err)
-				os.Exit(1)
-			}
-
+			checkerr(err)
 			scommit, err := objrepo.CommitObject(plumbing.NewHash(repo.Lasthash))
-			if err != nil {
-				fmt.Println("Error getting scommit:", err)
-				os.Exit(1)
-			}
+			checkerr(err)
 			filechanges := compare(hcommit, scommit, repo.Rulespath)
-			fmt.Println(filechanges)
+			for _, filechange := range filechanges {
+				fmt.Println("[+]", filechange.String())
+			}
 		}
+		repo.Lasthash = ref.Hash().String()
 		cfg.Repos[i] = repo
 		file, _ := json.MarshalIndent(cfg, "", " ")
 		_ = ioutil.WriteFile(STATEFILE, file, 0644)
 	}
-
 }
