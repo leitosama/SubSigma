@@ -1,0 +1,55 @@
+name: SubSigma cron
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.20.3
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Install notify
+        run: go install -v github.com/projectdiscovery/notify/cmd/notify@latest
+
+      - name: Create config for notfiy
+        run: |
+          mkdir -p $HOME/.config/notify/
+          cat >>$HOME/.config/notify/provider-config.yaml <<EOF
+          telegram:
+            - id: "tel"
+              telegram_api_key: "${{ secrets.TELEGRAM_BOT_TOKEN }}"
+              telegram_chat_id: "${{ secrets.TELEGRAM_ID }}"
+              telegram_format: "{{data}}"
+              telegram_parsemode: "Markdown"
+          EOF
+
+      - uses: actions/cache/restore@v3
+        id: cache-restore
+        with:
+          path: |
+            ./state.json
+          key: ${{ runner.os }}-state
+      
+      - run: |
+          chmod +x ./subsigma
+          cp config.json.sample config.json
+
+      - run: ./subsigma | notify
+
+      - name: Save Primes
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            ./state.json
+          key: ${{ steps.cache-restore.outputs.cache-primary-key }}
