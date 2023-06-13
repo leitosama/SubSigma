@@ -153,7 +153,9 @@ func main() {
 			for _, filechange := range filechanges {
 				compareresult += fmt.Sprintf("[%s](%s)\n", filechange.BaseName, filechange.RemoteUrl)
 			}
-			fmt.Print(compareresult)
+			if compareresult != "\n---\n" {
+				fmt.Print(compareresult)
+			}
 		}
 		if repo.LastCommit != ref.Hash().String() {
 			repo.LastCommit = ref.Hash().String()
