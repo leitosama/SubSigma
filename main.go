@@ -144,14 +144,16 @@ func main() {
 		ref, err := objrepo.Head()
 		checkerr(err)
 		if repo.LastCommit != "" {
+			compareresult := "\n---\n"
 			hcommit, err := objrepo.CommitObject(ref.Hash())
 			checkerr(err)
 			sCommit, err := objrepo.CommitObject(plumbing.NewHash(repo.LastCommit))
 			checkerr(err)
 			filechanges := compare(hcommit, sCommit, repo)
 			for _, filechange := range filechanges {
-				fmt.Printf("---\n%s\n%s\n", filechange.BaseName, filechange.RemoteUrl)
+				compareresult += fmt.Sprintf("[%s](%s)\n", filechange.BaseName, filechange.RemoteUrl)
 			}
+			fmt.Print(compareresult)
 		}
 		if repo.LastCommit != ref.Hash().String() {
 			repo.LastCommit = ref.Hash().String()
