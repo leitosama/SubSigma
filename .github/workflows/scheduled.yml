@@ -46,7 +46,7 @@ jobs:
           chmod +x ./subsigma
           cp config.json.sample config.json
 
-      - run: ./subsigma | notify
+      - run: ./subsigma | notify -silent -bulk
 
       - name: Cleanup cache before save state.json
         run: |
