@@ -32,6 +32,10 @@ jobs:
               telegram_chat_id: "${{ secrets.TELEGRAM_ID }}"
               telegram_format: "{{data}}"
               telegram_parsemode: "Markdown"
+          teams:
+            - id: "teams"
+              teams_webhook_url: "${{ secrets.TEAMS_WEBHOOK }}"
+              teams_format: "{{data}}"
           EOF
 
       - name: Get state.json cache
