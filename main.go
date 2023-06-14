@@ -6,13 +6,9 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
 )
 
@@ -23,67 +19,6 @@ func getEnv(key string, defaultVal string) string {
 	return defaultVal
 }
 
-type Config struct {
-	Repos []Repostitory `json:"repos"`
-}
-
-type Repostitory struct {
-	Addr       string `json:"addr"`
-	Branch     string `json:"branch"`
-	LastCommit string `json:"lastcommit"`
-	RulesPath  string `json:"rulespath"`
-}
-
-func (r Repostitory) String() string {
-	return fmt.Sprintf("{Addr: %s, Branch: %s, Lasthash: %s, Rulespath: %s}", r.Addr, r.Branch, r.LastCommit, r.RulesPath)
-}
-
-func (c Config) String() string {
-	return fmt.Sprintf("{Repos:%v}", c.Repos)
-}
-
-func normalize_path(dirtyPath string) string {
-	if dirtyPath == "." || dirtyPath == "" {
-		return ""
-	}
-	p := filepath.Clean(dirtyPath)
-	return strings.TrimPrefix(string(p), "/") + "/"
-}
-
-type ChangeEnum int8
-
-const (
-	New ChangeEnum = iota
-	Changed
-)
-
-type FileChange struct {
-	ChangeType ChangeEnum `json:"changetype"`
-	BaseName   string     `json:"basename"`
-	RemoteUrl  string     `json:"remoteurl"`
-}
-
-func (f FileChange) String() string {
-	return fmt.Sprintf("{ChangeType: %v, BaseName: %s, Url: %s}", f.ChangeType, f.BaseName, f.RemoteUrl)
-}
-
-func compare(hCommit *object.Commit, sCommit *object.Commit, repo Repostitory) []FileChange {
-	result := []FileChange{}
-	patch, err := sCommit.Patch(hCommit)
-	if err != nil {
-		os.Exit(1)
-	}
-	for _, el := range patch.FilePatches() {
-		oldfile, newfile := el.Files()
-		if oldfile == nil && strings.HasPrefix(newfile.Path(), repo.RulesPath) {
-			path := newfile.Path()
-			remoteurl := fmt.Sprintf("%s/blob/%s/%s", repo.Addr, repo.Branch, path)
-			result = append(result, FileChange{ChangeType: New, BaseName: filepath.Base(path), RemoteUrl: remoteurl})
-		}
-	}
-	return result
-}
-
 var (
 	VerboseLogger *log.Logger
 	InfoLogger    *log.Logger
@@ -92,6 +27,7 @@ var (
 	VERBOSE       bool   = false
 	STATEFILE     string = "./state.json"
 	CONFIGFILE    string = "./config.json"
+	configfile    string
 )
 
 // TODO: in config or to env or to cli options
@@ -105,6 +41,14 @@ func init() {
 	checkerr(err)
 	VERBOSE, err = strconv.ParseBool(getEnv("VERBOSE", "false"))
 	checkerr(err)
+	STATEFILE = getEnv("STATEFILE", "./state.json")
+	CONFIGFILE = getEnv("CONFIGFILE", "./config.json")
+	if _, err := os.Stat(STATEFILE); err == nil && USESTATE {
+		configfile = STATEFILE
+	} else {
+		configfile = CONFIGFILE
+	}
+
 }
 
 func checkerr(err error) {
@@ -115,20 +59,11 @@ func checkerr(err error) {
 }
 
 func main() {
-	var configfile string
-	if _, err := os.Stat(STATEFILE); err == nil && USESTATE {
-		configfile = STATEFILE
-	} else {
-		configfile = CONFIGFILE
+	cfg, err := GetConfig(configfile)
+	if cfg.Verbose || VERBOSE {
+		VERBOSE = true
 	}
-	config, err := ioutil.ReadFile(configfile)
 	checkerr(err)
-	cfg := &Config{}
-	err = json.Unmarshal([]byte(config), cfg)
-	checkerr(err)
-	for i, repo := range cfg.Repos {
-		cfg.Repos[i].RulesPath = normalize_path(repo.RulesPath)
-	}
 	if VERBOSE {
 		VerboseLogger.Println("config loaded.", cfg)
 	}
@@ -140,27 +75,35 @@ func main() {
 			URL: repo.Addr,
 		})
 		checkerr(err)
-
 		ref, err := objrepo.Head()
 		checkerr(err)
 		if repo.LastCommit != "" {
+			if VERBOSE {
+				VerboseLogger.Println("Analyzing...")
+			}
+			filechanges, err := AnalyzeRepo(objrepo, &repo)
+			if VERBOSE {
+				VerboseLogger.Println(filechanges)
+			}
+			checkerr(err)
 			compareresult := "\n---\n"
-			hcommit, err := objrepo.CommitObject(ref.Hash())
-			checkerr(err)
-			sCommit, err := objrepo.CommitObject(plumbing.NewHash(repo.LastCommit))
-			checkerr(err)
-			filechanges := compare(hcommit, sCommit, repo)
 			for _, filechange := range filechanges {
 				compareresult += fmt.Sprintf("[%s](%s)\n", filechange.BaseName, filechange.RemoteUrl)
 			}
 			if compareresult != "\n---\n" {
+				if VERBOSE {
+					VerboseLogger.Println("Here is results:")
+				}
 				fmt.Print(compareresult)
 			}
 		}
 		if repo.LastCommit != ref.Hash().String() {
+			if VERBOSE {
+				VerboseLogger.Println("Updating lasthash")
+			}
 			repo.LastCommit = ref.Hash().String()
 			cfg.Repos[i] = repo
-			fmt.Printf("[+] %s lastcommit - %s", repo.Addr, repo.LastCommit)
+			fmt.Printf("[+] %s lastcommit - %s\n", repo.Addr, repo.LastCommit)
 		}
 		file, _ := json.MarshalIndent(cfg, "", " ")
 		_ = ioutil.WriteFile(STATEFILE, file, 0644)
