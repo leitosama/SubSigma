@@ -3,7 +3,7 @@
     "repos": [{
         "addr": "https://github.com/leitosama/SubSigma",
         "branch": "dev",
-        "lastcommit": "",
+        "lastcommit": "7f81f8f99065340abcdb7ed5f8dc825113ad739c",
         "rulespath": "test/data/rules/"
     }
     ]
