@@ -1,6 +1,7 @@
 {
+    "verbose": false,
     "repos": [{
-            "addr": "https://github.com/joesecurity/sigma-rules/",
+            "addr": "https://github.com/joesecurity/sigma-rules",
             "branch": "master",
             "rulespath": "rules"
         },
