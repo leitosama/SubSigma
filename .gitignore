@@ -25,3 +25,5 @@ data
 config.json
 state.json
 .vscode
+!test/*
+!test/data/state.json

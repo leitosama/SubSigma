@@ -1,0 +1,10 @@
+{
+    "verbose": false,
+    "repos": [{
+        "addr": "https://github.com/leitosama/SubSigma",
+        "branch": "dev",
+        "lastcommit": "",
+        "rulespath": "test/data/rules/"
+    }
+    ]
+}
