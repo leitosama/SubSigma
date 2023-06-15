@@ -14,7 +14,7 @@ type Config struct {
 }
 
 func (c Config) String() string {
-	return fmt.Sprintf("{Repos:%v}", c.Repos)
+	return fmt.Sprintf("%#v", c)
 }
 
 type Repository struct {
@@ -25,7 +25,7 @@ type Repository struct {
 }
 
 func (r Repository) String() string {
-	return fmt.Sprintf("{Addr: %s, Branch: %s, Lasthash: %s, Rulespath: %s}", r.Addr, r.Branch, r.LastCommit, r.RulesPath)
+	return fmt.Sprintf("%#v", r)
 }
 
 func normalize_path(dirtyPath string) string {
