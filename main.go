@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/storage/memory"
@@ -72,13 +73,14 @@ func main() {
 		if VERBOSE {
 			VerboseLogger.Printf("processing repos[%d] - %s", i, repo.String())
 		}
-		objrepo, err := git.Clone(memory.NewStorage(), nil, &git.CloneOptions{
+		fs := memfs.New()
+		objrepo, err := git.Clone(memory.NewStorage(), fs, &git.CloneOptions{
 			URL: repo.Addr,
 		})
 		checkerr(err)
 		ref, err := objrepo.Reference(plumbing.ReferenceName(fmt.Sprintf("refs/remotes/origin/%s", repo.Branch)), false)
 		checkerr(err)
-		if repo.LastCommit != "" {
+		if repo.LastCommit != "" && repo.LastCommit != ref.Hash().String() {
 			if VERBOSE {
 				VerboseLogger.Println("Analyzing...")
 			}
@@ -86,31 +88,38 @@ func main() {
 			checkerr(err)
 			sCommit, err := objrepo.CommitObject(plumbing.NewHash(repo.LastCommit))
 			checkerr(err)
-			comparelink := fmt.Sprintf("%scompare/%s...%s", repo.Addr, sCommit.Hash.String()[0:7], hCommit.Hash.String()[0:7])
+			comparelink := fmt.Sprintf("%s/compare/%s...%s", repo.Addr, sCommit.Hash.String()[0:7], hCommit.Hash.String()[0:7])
 			fmt.Printf("------\n[%s %s <- %s](%s)\n", GetRepoAuthor(repo), sCommit.Hash.String()[0:7], hCommit.Hash.String()[0:7], comparelink)
 			filechanges, err := Compare(hCommit, sCommit, &repo)
+			for i, filechange := range filechanges {
+				file, err := fs.Open(filechange.Path)
+				checkerr(err)
+				fileContent, err := ioutil.ReadAll(file)
+				checkerr(err)
+				filechanges[i] = EnrichFileChange(filechange, fileContent)
+			}
 			if VERBOSE {
 				VerboseLogger.Println(filechanges)
 			}
 			checkerr(err)
-			compareresult := "\n---\n"
+			compareresult := ""
 			for _, filechange := range filechanges {
 				compareresult += fmt.Sprintf("[%s](%s)\n", filechange.BaseName, filechange.RemoteUrl)
 			}
-			if compareresult != "\n---\n" {
+			if compareresult != "" {
 				if VERBOSE {
 					VerboseLogger.Println("Here is results:")
 				}
 				fmt.Print(compareresult)
 			}
+			fmt.Println()
 		}
 		if repo.LastCommit != ref.Hash().String() {
 			if VERBOSE {
-				VerboseLogger.Println("Updating lasthash")
+				VerboseLogger.Printf("[+] %s lastcommit - %s\n", repo.Addr, repo.LastCommit)
 			}
 			repo.LastCommit = ref.Hash().String()
 			cfg.Repos[i] = repo
-			fmt.Printf("[+] %s lastcommit - %s\n", repo.Addr, repo.LastCommit)
 		}
 		file, _ := json.MarshalIndent(cfg, "", " ")
 		_ = ioutil.WriteFile(STATEFILE, file, 0644)
