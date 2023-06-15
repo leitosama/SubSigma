@@ -13,8 +13,8 @@ logsource:
     product: windows
 detection:
     selection:
-        FieldName1: 'StringValue'
-        FieldName2: IntegerValue
+        FieldName2: 'StringValue'
+        FieldName3: IntegerValue
     condition: selection
 fields:
     - commit_id
