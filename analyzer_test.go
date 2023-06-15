@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"path/filepath"
 	"testing"
 
@@ -23,8 +24,20 @@ func TestCompare(t *testing.T) {
 	hCommit, _ := objrepo.CommitObject(ref.Hash())
 	got, _ := Compare(hCommit, beforenewfile, &repo)
 	rurl := fmt.Sprintf("%s/blob/%s/%s", repo.Addr, repo.Branch, rulefile)
-	want := []FileChange{{ChangeType: 0, BaseName: filepath.Base(rulefile), RemoteUrl: rurl}}
+	want := []FileChange{{ChangeType: 0, BaseName: filepath.Base(rulefile), RemoteUrl: rurl, Path: rulefile}}
 	if got[0] != want[0] {
-		t.Errorf("got - %v, want - %v", got, want)
+		t.Errorf("\ngot: %v\nwant: %v", got, want)
+	}
+}
+
+func TestEnrichFileChange(t *testing.T) {
+	example := FileChange{Path: "test/data/rules/example.yml"}
+	d, _ := ioutil.ReadFile(example.Path)
+	want := example
+	want.RuleDesc = "Sample description"
+	want.RuleTitle = "Test rule"
+	got := EnrichFileChange(example, d)
+	if got != want {
+		t.Errorf("\ngot: %v\nwant: %v", got, want)
 	}
 }
