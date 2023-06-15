@@ -1,0 +1,23 @@
+title: Test rule
+id: 7a8635d8-be15-48e4-aab0-42c9c492ef12
+status: experimental
+description: Sample description
+references:
+  - https://github.com/leitosama/SubSigma
+tags:
+  - mitre.ta0003
+author: leitosama
+date: 2023/06/15
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        FieldName2: 'StringValue'
+        FieldName3: IntegerValue
+    condition: selection
+fields:
+    - commit_id
+falsepositives:
+    - Unknown
+level: informational
