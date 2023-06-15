@@ -36,6 +36,11 @@ func normalize_path(dirtyPath string) string {
 	return strings.TrimPrefix(string(p), "/") + "/"
 }
 
+func GetRepoAuthor(r Repository) string {
+	s := strings.Split(r.Addr, "/")
+	return s[len(s)-2]
+}
+
 func GetConfig(configfile string) (*Config, error) {
 	config, err := ioutil.ReadFile(configfile)
 	checkerr(err)

@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/storage/memory"
 )
 
@@ -75,13 +76,19 @@ func main() {
 			URL: repo.Addr,
 		})
 		checkerr(err)
-		ref, err := objrepo.Head()
+		ref, err := objrepo.Reference(plumbing.ReferenceName(fmt.Sprintf("refs/remotes/origin/%s", repo.Branch)), false)
 		checkerr(err)
 		if repo.LastCommit != "" {
 			if VERBOSE {
 				VerboseLogger.Println("Analyzing...")
 			}
-			filechanges, err := AnalyzeRepo(objrepo, &repo)
+			hCommit, err := objrepo.CommitObject(ref.Hash())
+			checkerr(err)
+			sCommit, err := objrepo.CommitObject(plumbing.NewHash(repo.LastCommit))
+			checkerr(err)
+			comparelink := fmt.Sprintf("%scompare/%s...%s", repo.Addr, sCommit.Hash.String()[0:7], hCommit.Hash.String()[0:7])
+			fmt.Printf("------\n[%s %s <- %s](%s)\n", GetRepoAuthor(repo), sCommit.Hash.String()[0:7], hCommit.Hash.String()[0:7], comparelink)
+			filechanges, err := Compare(hCommit, sCommit, &repo)
 			if VERBOSE {
 				VerboseLogger.Println(filechanges)
 			}
