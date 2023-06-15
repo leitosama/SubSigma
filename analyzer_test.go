@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/storage/memory"
 )
 
 func TestCompare(t *testing.T) {
@@ -18,9 +19,11 @@ func TestCompare(t *testing.T) {
 		RulesPath:  "test/data/rules/",
 	}
 	rulefile := "test/data/rules/example.yml"
-	objrepo, _ := git.PlainOpen(".")
+	objrepo, _ := git.Clone(memory.NewStorage(), nil, &git.CloneOptions{
+		URL: repo.Addr,
+	})
 	beforenewfile, _ := objrepo.CommitObject(plumbing.NewHash(repo.LastCommit))
-	ref, _ := objrepo.Head()
+	ref, _ := objrepo.Reference(plumbing.ReferenceName(fmt.Sprintf("refs/remotes/origin/%s", repo.Branch)), false)
 	hCommit, _ := objrepo.CommitObject(ref.Hash())
 	got, _ := Compare(hCommit, beforenewfile, &repo)
 	rurl := fmt.Sprintf("%s/blob/%s/%s", repo.Addr, repo.Branch, rulefile)
